@@ -22,7 +22,7 @@ def show_samples(label):
     z = 1.0 * torch.randn(N_samples, model.ndim_total).cuda()
 
     with torch.no_grad():
-        samples = cinn.reverse_sample(z, l).cpu().numpy()
+        samples = cinn.reverse_sample(z, l)[0].cpu().numpy()
         samples = data.unnormalize(samples)
 
     full_image = np.zeros((28*10, 28*10))

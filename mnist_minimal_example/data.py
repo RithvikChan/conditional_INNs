@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torchvision.transforms as T
 import torchvision.datasets
 
-batch_size = 256
+batch_size = 128
 data_mean = 0.128
 data_std = 0.305
 
@@ -16,9 +16,9 @@ def unnormalize(x):
     return x * data_std + data_mean
 
 
-train_data = torchvision.datasets.MNIST(data_dir, train=True, download=True,
+train_data = torchvision.datasets.CIFAR10(data_dir, train=True, download=True,
                                         transform=T.Compose([T.ToTensor(), lambda x: (x - data_mean) / data_std]))
-test_data = torchvision.datasets.MNIST(data_dir, train=False, download=True,
+test_data = torchvision.datasets.CIFAR10(data_dir, train=False, download=True,
                                         transform=T.Compose([T.ToTensor(), lambda x: (x - data_mean) / data_std]))
 
 # Sample a fixed batch of 1024 validation examples

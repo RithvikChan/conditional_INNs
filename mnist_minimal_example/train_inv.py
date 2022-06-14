@@ -22,51 +22,34 @@ t_start = time()
 nll_mean = []
 nll_mean_rev = []
 
+loss_list_orig = []
+loss_list_synth = []
+
 
 print('Epoch\tBatch/Total \tTime \tNLL train\tNLL val\tLR')
 for epoch in range(N_epochs):
     print(len(data.train_loader))
     for i, (x, l) in enumerate(data.train_loader):
+
         x, l = x.cuda(), l.cuda()
-        z, log_j, outs = cinn(x, l)
-        
+        out, forward_log_j, _ = invert_cinn(x, l)
+        synth_x, log_j_rev, outs_rev = invert_cinn.reverse_sample(out, l)
+
+        print("SIZE:", synth_x.size())
+
+        new_synth_x = torch.detach(synth_x)
         
 
-        # Train with reverse
-        # randval = 1.0 * torch.randn(256, model.ndim_total).cuda()
-        # synth_x = cinn.reverse_sample(out, l)[0]
-        # z, log_j = cinn(synth_x, l)
-        # print(log_j.size())
+        z, log_j, outs = cinn(new_synth_x, l)
+
+
+        inver_nll = torch.mean(out**2) / 2 - torch.mean(forward_log_j) / model.ndim_total
+        inver_nll.backward()
+
         nll = torch.mean(z**2) / 2 - torch.mean(log_j) / model.ndim_total
         nll.backward()
 
-        out, forward_log_j, outs_rev_removed = invert_cinn(x, l)
-        synth_x, log_j_rev, outs_rev = invert_cinn.reverse_sample(out, l)
-        z_rev, log_j_rev_forw, _ = invert_cinn(synth_x, l)
         
-        # print("REV::") 
-        # print(list(outs_rev.keys())[::-1])
-        # print("REM::")
-        # print(list(outs_rev_removed.keys()))
-        
-        if i==229:
-            mse_list = []
-            interm_keys = list(outs_rev_removed.keys())
-            print(interm_keys[:15])
-            for interm_val in range(0,15):
-                first_interms = outs_rev[interm_keys[interm_val]].cpu().detach().numpy().flatten()
-                second_interms = outs_rev_removed[interm_keys[interm_val]].cpu().detach().numpy().flatten()
-                mse = np.sum(np.square(np.subtract(first_interms, second_interms)))/len(first_interms)
-                mse_list.append(mse)
-            print(mse_list)
-            plt.plot([str(i) for i in list(range(0,15))], mse_list, label =str(epoch))
-            plt.legend()
-            plt.savefig("analysis.png")
-
-        inver_nll = torch.mean(z_rev**2) / 2 - torch.mean(log_j_rev_forw) / model.ndim_total
-        inver_nll.backward()
-
-
         #Normal
         torch.nn.utils.clip_grad_norm_(cinn.trainable_parameters, 10.)
 
@@ -83,6 +66,14 @@ for epoch in range(N_epochs):
         invert_cinn.optimizer.zero_grad()
 
 
+    loss_list_orig.append(np.mean(nll_mean_rev))
+    loss_list_synth.append(np.mean(nll_mean))
+
+    if epoch == 10:
+        plt.plot([str(i) for i in list(range(0,epoch+1))], loss_list_orig, label ='Original')
+        plt.plot([str(i) for i in list(range(0,epoch+1))], loss_list_synth, label ='Synth')
+        plt.legend()
+        plt.savefig("analysis_loss.png")
     with torch.no_grad():
         z, log_j, interms = cinn(data.val_x, data.val_l)
         nll_val = torch.mean(z**2) / 2 - torch.mean(log_j) / model.ndim_total
